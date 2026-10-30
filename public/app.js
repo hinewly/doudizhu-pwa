@@ -4,7 +4,7 @@
   var R = window.DDRules;
   var AI = window.DDAI;
   var SFX = window.DDSound;
-  var APP_VERSION = "v0.1.1";
+  var APP_VERSION = "v0.1.2";
   var SAVE_CLASSIC = "dbdoudizhu-classic-v1";
   var SAVE_SCORE = "dbdoudizhu-score-v1";
   var SAVE_UNLOCK = "dbdoudizhu-unlock-v1";
@@ -20,6 +20,7 @@
   var hintIdx = 0;
   var aiTimer = null;
   var locked = false;
+  var paused = false;
   var pzHintTimer = null;
 
   /* ---------- 工具 ---------- */
@@ -69,6 +70,8 @@
   /* ---------- 屏幕切换 ---------- */
   function show(scr) {
     screen = scr;
+    paused = false;
+    $("pause-modal").classList.add("hidden");
     $("menu").classList.toggle("hidden", scr !== "menu");
     $("classic").classList.toggle("hidden", scr !== "classic");
     $("puzzle").classList.toggle("hidden", scr !== "puzzle");
@@ -128,7 +131,7 @@
   /* 叫分 */
   function scheduleBidAI() {
     clearTimeout(aiTimer);
-    if (!C || C.phase !== "bid") return;
+    if (!C || C.phase !== "bid" || paused) return;
     var seat = C.bidTurn;
     if (seat === 0) { renderBidControls(); return; }
     aiTimer = setTimeout(function () {
@@ -242,7 +245,7 @@
   /* AI 调度（经典） */
   function scheduleAI() {
     clearTimeout(aiTimer);
-    if (!C || C.phase !== "play" || locked || screen !== "classic") return;
+    if (!C || C.phase !== "play" || locked || paused || screen !== "classic") return;
     var seat = C.turn;
     if (seat === 0) return;
     aiTimer = setTimeout(function () {
@@ -269,6 +272,7 @@
 
   /* 人类操作（经典/残局共用，mode 参数） */
   function humanPlay(mode) {
+    if (paused) return;
     var st = mode === "classic" ? C : P;
     var hand = st.hands[0];
     var cards = Array.from(selected).map(function (i) { return hand[i]; });
@@ -280,12 +284,14 @@
     if (mode === "classic") doPlay(0, cards); else pzDoPlay(0, cards);
   }
   function humanPass(mode) {
+    if (paused) return;
     var st = mode === "classic" ? C : P;
     if (!st.trick || st.trick.seat === 0) { flashMsg("本轮由你先出，不能过"); return; }
     selected.clear();
     if (mode === "classic") doPass(0); else pzDoPass(0);
   }
   function humanHint(mode) {
+    if (paused) return;
     var st = mode === "classic" ? C : P;
     var hand = st.hands[0];
     var opts = st.trick ? R.responses(hand, st.trick) : R.allLeads(hand);
@@ -354,7 +360,7 @@
   }
   function onCardClick(i, mode) {
     var st = mode === "classic" ? C : P;
-    if (locked || st.turn !== 0) return;
+    if (locked || paused || st.turn !== 0) return;
     if (mode === "classic" && st.phase !== "play") return;
     if (selected.has(i)) selected.delete(i); else selected.add(i);
     renderHand(mode);
@@ -394,7 +400,7 @@
   }
   function schedulePzAI() {
     clearTimeout(aiTimer);
-    if (!P || locked || screen !== "puzzle" || P.turn === 0) return;
+    if (!P || locked || paused || screen !== "puzzle" || P.turn === 0) return;
     var seat = P.turn;
     aiTimer = setTimeout(function () {
       if (!P || P.turn !== seat || locked || screen !== "puzzle") return;
@@ -491,7 +497,7 @@
   }
   /* 残局提示：调求解器找必胜着法 */
   function pzHint() {
-    if (!P || P.turn !== 0 || locked) return;
+    if (!P || P.turn !== 0 || locked || paused) return;
     flashMsg("计算中…");
     setTimeout(function () {
       try {
@@ -604,6 +610,31 @@
     return rec(hands, turn, trick);
   }
 
+  /* ---------- 暂停 ---------- */
+  function togglePause() {
+    var inGame = (screen === "classic" && C) || (screen === "puzzle" && P);
+    if (!inGame || paused) return;
+    var resultVisible = !$("result-modal").classList.contains("hidden");
+    if (resultVisible) return;
+    paused = true;
+    clearTimeout(aiTimer);
+    SFX.play("pause");
+    SFX.pauseBGM();
+    $("pause-modal").classList.remove("hidden");
+  }
+  function resumeGame() {
+    if (!paused) return;
+    paused = false;
+    $("pause-modal").classList.add("hidden");
+    SFX.play("click");
+    SFX.resumeBGM();
+    if (screen === "classic") { if (C && C.phase === "bid") scheduleBidAI(); else scheduleAI(); }
+    else if (screen === "puzzle") schedulePzAI();
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) togglePause();
+  });
+
   /* ---------- 时长体系 ---------- */
   function applyTimeLock() {
     locked = true;
@@ -656,7 +687,7 @@
 
     $("bid-controls").querySelectorAll("button").forEach(function (b) {
       b.addEventListener("click", function () {
-        if (!C || C.phase !== "bid" || C.bidTurn !== 0 || locked) return;
+        if (!C || C.phase !== "bid" || C.bidTurn !== 0 || locked || paused) return;
         $("bid-controls").classList.add("hidden");
         applyBid(0, parseInt(b.dataset.bid, 10));
       });
@@ -667,6 +698,9 @@
     $("pz-play").addEventListener("click", function () { if (P && P.turn === 0) humanPlay("puzzle"); });
     $("pz-pass").addEventListener("click", function () { if (P && P.turn === 0) humanPass("puzzle"); });
     $("pz-hint").addEventListener("click", pzHint);
+    $("btn-pause").addEventListener("click", togglePause);
+    $("pz-pause").addEventListener("click", togglePause);
+    $("btn-resume").addEventListener("click", resumeGame);
 
     $("btn-result-ok").addEventListener("click", function () {
       $("result-modal").classList.add("hidden");
