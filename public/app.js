@@ -4,7 +4,7 @@
   var R = window.DDRules;
   var AI = window.DDAI;
   var SFX = window.DDSound;
-  var APP_VERSION = "v0.1.4";
+  var APP_VERSION = "v0.1.5";
   var SAVE_CLASSIC = "dbdoudizhu-classic-v1";
   var SAVE_SCORE = "dbdoudizhu-score-v1";
   var SAVE_UNLOCK = "dbdoudizhu-unlock-v1";
@@ -358,6 +358,23 @@
   }
 
   /* ---------- 滑动连选：按住划过即选，支持鼠标拖拽与手机滑动 ---------- */
+  /* 划选加牌是否可入：保证划出来的组合符合扑克牌型规律（如 67889T 只选成 6789T 顺子，多余的 8 跳过） */
+  function dragCanAdd(chosenCards, card) {
+    var test = chosenCards.concat([card]);
+    if (test.length <= 2) return true;
+    var p = R.classify(test);
+    if (p) return true; // 已是完整合法牌型（对/三/三带/炸弹/顺子…）
+    // 未成型但"在推进中"：点数连续、每种牌张数不递增（如 33→334→3344→334455 连对、678→6789 顺子），
+    // 单种最多 3 张、不含 2 和王；跨张数混选（如 6788 的多余 8、3456 混对）会被跳过
+    var counts = R.countsOf(test);
+    var keys = Object.keys(counts).map(Number).sort(function (x, y) { return x - y; });
+    var prev = counts[keys[0]];
+    if (prev > 3) return false;
+    var nonIncreasing = keys.every(function (k) { var c = counts[k]; if (c > prev) return false; prev = c; return true; });
+    var consecutive = keys[keys.length - 1] - keys[0] === keys.length - 1;
+    if (nonIncreasing && consecutive && keys[keys.length - 1] <= 14) return true;
+    return false;
+  }
   function handPointerDown(e) {
     var container = e.currentTarget;
     var st = screen === "classic" ? C : P;
@@ -383,7 +400,14 @@
     var i = parseInt(node.dataset.i, 10);
     if (i === dragSel.last) return;
     dragSel.last = i;
-    if (dragSel.mode === "add") selected.add(i); else selected.delete(i);
+    if (dragSel.mode === "add") {
+      var st = screen === "classic" ? C : P;
+      var chosen = Array.from(selected).map(function (idx) { return st.hands[0][idx]; });
+      if (!dragCanAdd(chosen, st.hands[0][i])) { e.preventDefault(); return; } // 不合牌型规律，跳过
+      selected.add(i);
+    } else {
+      selected.delete(i);
+    }
     renderHand(screen);
     e.preventDefault();
   }
