@@ -1,6 +1,6 @@
 # 斗地主首版搭建 交接
 
-- last_updated: 2026-10-30 14:10
+- last_updated: 2026-10-30 14:35
 - status: done（国内已上线，剩手机实测）
 - version: v0.1.5
 
@@ -10,7 +10,7 @@
 
 ## 当前状态
 
-✅ 国内站已上线：https://doudizhu.daobox.net.cn（HTTPS 200，线上 E2E 全通过：菜单/经典局叫分当地主/出牌收墩/残局第 1 关求解器提示通关解锁第 2 关/portal 胶囊剩 14 分）。剩手机实测。
+✅ 国内站已上线：https://doudizhu.daobox.net.cn（HTTPS 200）。v0.1.5 划选牌型感知线上 E2E 通过（拖选 10→9→8→8→7→6 自动跳过多余 8 → selected=[10,9,8,7,6] → 出牌"顺子 5张"）。缓存已修复：app.js?v=7 + SW CACHE v9 已部署上线（2026-10-30 14:30 验证）。剩：手机实测 + 用户确认新版 BGM 是否满意。
 
 ## 最近完成
 
@@ -34,6 +34,8 @@
 - [x] daobox-home 首页轻松一刻入口（commit 0b49923 portal + app.js 入口，国内 commit cbecb616；海外 worker cbecb616）
 - [x] 线上 E2E（Playwright 截图在 _temp-screenshots/2026-10/）
 - [ ] 手机实测：加主屏幕、离线、横竖屏、长局稳定性
+- [ ] 用户确认新版 BGM（v0.1.2 重写的欢快风原创旋律）是否满意——用户曾反馈"音乐不好听"，重写后未收到确认
+- [ ] 二期候选：四川长牌三变体独立项目 changpai-pwa（见 docs/roadmap-changpai.md，P1 幺地人）
 
 ## 重要决策
 
@@ -44,6 +46,7 @@
 
 ## 注意事项
 
+- ⚠️ 改动 app.js/style.css/sounds.js 必须同步升 index.html 的 ?v=N + service-worker.js 的 CACHE 名 + ASSETS 数组里的对应 ?v=，三处缺一不可——SW 是 cache-first（hit || fetch），SW 文件本身没变就不会重新预缓存，老用户永远拿旧文件（v0.1.5 修正提交 5cd1632 就漏了，966a563 补上）
 - ⚠️ beats() 兼容裸 play 和 {play,...} 包装（本次踩过：仿真非法出牌 100% 复现就是这个）
 - ⚠️ 牌串解码必须 strip 空白（puzzles.js 存的是空格分隔串，逐字符解码会把空格变 undefined 垃圾牌）
 - 残局关卡换规则引擎后必须重新生成+复验（旧关卡在旧 buggy responses 下生成，全部作废过一次）
