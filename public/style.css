@@ -129,7 +129,7 @@ body {
 .btn.ghost { background: transparent; border-color: rgba(245,232,224,.25); color: var(--muted); }
 .btn.small { padding: 5px 12px; font-size: 12px; }
 .my-hand { display: flex; flex-wrap: nowrap; justify-content: center; align-items: flex-end; padding: 20px 4px 6px; min-height: 96px; }
-.my-hand .card { margin-left: -20px; transition: transform .12s, box-shadow .12s; }
+.my-hand .card { margin-left: -11px; transition: transform .12s, box-shadow .12s; }
 .my-hand .card:first-child { margin-left: 0; }
 .my-hand .card:hover { transform: translateY(-10px); z-index: 5; }
 .my-hand .card.sel { transform: translateY(-20px); z-index: 6; }
@@ -169,6 +169,6 @@ body {
   .card .r { font-size: 17px; }
   .card.mini { width: 26px; height: 37px; }
   .card.mini .r { font-size: 13px; }
-  .my-hand .card { margin-left: -16px; }
+  .my-hand .card { margin-left: -9px; }
   .my-hand { min-height: 78px; }
 }
