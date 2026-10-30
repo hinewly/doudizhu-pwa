@@ -4,7 +4,7 @@
   var R = window.DDRules;
   var AI = window.DDAI;
   var SFX = window.DDSound;
-  var APP_VERSION = "v0.1.2";
+  var APP_VERSION = "v0.1.3";
   var SAVE_CLASSIC = "dbdoudizhu-classic-v1";
   var SAVE_SCORE = "dbdoudizhu-score-v1";
   var SAVE_UNLOCK = "dbdoudizhu-unlock-v1";
@@ -653,6 +653,9 @@
     $("app-version").textContent = APP_VERSION;
     SFX.init();
     updateSoundBtn();
+    setTimeout(function () {
+      if (SFX.getMode() === 2 && screen === "menu") flashMsg("🎵 音乐已就绪 · 点击屏幕任意处开始播放");
+    }, 1500);
     $("sound-btn").addEventListener("click", function () { SFX.toggle(); updateSoundBtn(); SFX.play("click"); });
     $("refresh-btn").addEventListener("click", function () {
       if ("caches" in window) {

@@ -107,7 +107,7 @@
     var o = c.createOscillator(), g = c.createGain();
     o.type = "triangle"; o.frequency.value = freq;
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.14, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.17, t + 0.01);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
     o.connect(g).connect(c.destination);
     o.start(t); o.stop(t + 0.25);
@@ -134,7 +134,7 @@
       // 旋律跳音（每步）
       var m = MELODY[step];
       if (m) {
-        pluck2(NOTE[m], bgmNextTime, step % 4 === 0 ? 0.075 : 0.055);
+        pluck2(NOTE[m], bgmNextTime, step % 4 === 0 ? 0.095 : 0.07);
         if (step % 8 === 0) sparkle(NOTE[m], bgmNextTime);
       }
       // 贝斯：每拍（偶数步）根音，第 4、8 步加五度
@@ -160,24 +160,34 @@
   function resumeBGM() { if (mode === 2 && !bgmTimer) { var c = ac(); if (c) { bgmNextTime = c.currentTime + 0.2; scheduleBGM(); bgmTimer = setInterval(scheduleBGM, 250); } } }
 
   function setMode(m) {
+    var was = mode;
     mode = m;
+    if (m === 2 && was !== 2) { var c = ac(); if (c) { var t0 = c.currentTime + 0.02; [523, 659, 784, 1047].forEach(function (f, i) { tone(f, t0 + i * 0.09, 0.2, 0.12, "triangle"); }); } }
     try { localStorage.setItem(SAVE_KEY, String(m)); } catch (e) {}
     if (mode === 2) startBGM(); else stopBGM();
   }
   function toggle() { setMode(mode === 0 ? 2 : mode - 1); return mode; }
   function getMode() { return mode; }
 
+  function tryStartOnGesture() {
+    if (mode === 2 && !bgmTimer) startBGM();
+    if (bgmTimer) {
+      document.removeEventListener("pointerdown", tryStartOnGesture);
+      document.removeEventListener("touchend", tryStartOnGesture);
+      document.removeEventListener("keydown", tryStartOnGesture);
+    }
+  }
   function init() {
-    // BGM 延迟到首次用户手势再启动（浏览器自动播放限制，同时消除 suspended 警告）
+    // BGM 延迟到首次用户手势再启动（浏览器自动播放限制）；多点事件兜底，iOS 用 touchend
     if (!init._bound) {
       init._bound = true;
-      document.addEventListener("pointerdown", function once() {
-        if (mode === 2 && !bgmTimer) startBGM();
-        document.removeEventListener("pointerdown", once);
-      });
+      document.addEventListener("pointerdown", tryStartOnGesture);
+      document.addEventListener("touchend", tryStartOnGesture);
+      document.addEventListener("keydown", tryStartOnGesture);
     }
   }
 
-  global.DDSound = { init: init, play: play, toggle: toggle, getMode: getMode, setMode: setMode, pauseBGM: pauseBGM, resumeBGM: resumeBGM };
+    function debug() { return { mode: mode, ctxState: ctx ? ctx.state : "none", bgmRunning: !!bgmTimer }; }
+  global.DDSound = { init: init, play: play, toggle: toggle, getMode: getMode, setMode: setMode, pauseBGM: pauseBGM, resumeBGM: resumeBGM, debug: debug };
   if (typeof module !== "undefined" && module.exports) module.exports = global.DDSound;
 })(typeof window !== "undefined" ? window : globalThis);
