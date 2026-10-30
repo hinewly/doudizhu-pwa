@@ -1,0 +1,16 @@
+{
+  "name": "斗地主 · DaoBox",
+  "short_name": "斗地主",
+  "description": "经典三人斗地主 + 残局闯关解谜，单机 AI 对手，免费畅玩！",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#3d0c0c",
+  "theme_color": "#7f1d1d",
+  "icons": [
+    { "src": "icons/icon-48.png", "sizes": "48x48", "type": "image/png" },
+    { "src": "icons/icon-64.png", "sizes": "64x64", "type": "image/png" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

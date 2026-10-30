@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <script>
+    // 双域名适配：国内 daobox.net.cn / 海外 daobox.app（斗地主暂只部署国内）
+    window.DB_HOME = location.hostname.indexOf('daobox.net.cn') !== -1
+      ? 'https://daobox.net.cn' : 'https://daobox.app';
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>斗地主 · DaoBox 经典棋牌</title>
+  <meta name="description" content="DaoBox 斗地主：经典三人斗地主 + 残局闯关（明牌解谜），单机 AI 对手，免费畅玩，随时来一局。">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#7f1d1d">
+  <link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">🃏 斗地主</div>
+      <div class="topbar-tools"><span class="version-badge" id="app-version">v0.1.0</span><button class="refresh-btn" id="refresh-btn" type="button" title="强制刷新 · 清缓存重载" aria-label="强制刷新">↻</button></div>
+      <div class="topbar-slot" id="db-account-slot"></div>
+    </div>
+  </header>
+
+  <main class="page">
+    <!-- 模式选择 -->
+    <section id="menu" class="menu">
+      <h2 class="menu-title">选择玩法</h2>
+      <button class="mode-card" id="btn-mode-classic" type="button">
+        <span class="mode-icon">🂡</span>
+        <span class="mode-name">经典斗地主</span>
+        <span class="mode-desc">叫分抢地主 · 三人轮流对战 AI</span>
+      </button>
+      <button class="mode-card" id="btn-mode-puzzle" type="button">
+        <span class="mode-icon">🧩</span>
+        <span class="mode-name">残局闯关</span>
+        <span class="mode-desc">明牌解谜 · 对手牌面全知，找到必胜路线</span>
+        <span class="mode-progress" id="puzzle-progress"></span>
+      </button>
+      <div class="menu-score" id="menu-score"></div>
+    </section>
+
+    <!-- 经典模式 -->
+    <section id="classic" class="hidden">
+      <section class="hud">
+        <div class="score-box"><div class="score-label">身份</div><div class="score-value role-badge" id="cd-role">—</div></div>
+        <div class="score-box"><div class="score-label">底分×倍数</div><div class="score-value" id="cd-mult">—</div></div>
+        <div class="score-box"><div class="score-label">我的积分</div><div class="score-value them" id="cd-score">0</div></div>
+      </section>
+      <p class="hint" id="cd-info">点击下方按钮开始</p>
+      <div class="table">
+        <div class="seat seat-l" id="seat-2"></div>
+        <div class="seat seat-r" id="seat-1"></div>
+        <div class="center-info">
+          <div id="bottom-cards" class="bottom-cards"></div>
+          <div id="game-log" class="game-log" aria-live="polite"></div>
+        </div>
+        <div class="my-zone">
+          <div class="bid-controls hidden" id="bid-controls">
+            <span class="bid-label" id="bid-label">请叫分：</span>
+            <button class="btn" data-bid="1" type="button">1 分</button>
+            <button class="btn" data-bid="2" type="button">2 分</button>
+            <button class="btn" data-bid="3" type="button">3 分</button>
+            <button class="btn ghost" data-bid="0" type="button">不叫</button>
+          </div>
+          <div class="controls" id="play-controls">
+            <button id="btn-play" class="btn primary" type="button">出牌</button>
+            <button id="btn-pass" class="btn" type="button">要不起</button>
+            <button id="btn-hint" class="btn" type="button">提示</button>
+          </div>
+          <div id="my-hand" class="my-hand" aria-label="你的手牌"></div>
+        </div>
+      </div>
+      <div class="exit-row"><button id="btn-exit-classic" class="btn small ghost" type="button">← 返回菜单</button></div>
+    </section>
+
+    <!-- 残局模式 -->
+    <section id="puzzle" class="hidden">
+      <section class="hud">
+        <div class="score-box"><div class="score-label">关卡</div><div class="score-value" id="pz-level">1</div></div>
+        <div class="score-box"><div class="score-label">模式</div><div class="score-value role-badge" id="pz-mode">明牌残局</div></div>
+        <div class="score-box"><div class="score-label">目标</div><div class="score-value them" id="pz-goal">先出完</div></div>
+      </section>
+      <p class="hint" id="pz-info">对手手牌全明。你先出，出完即胜。</p>
+      <div class="table">
+        <div class="seat seat-l" id="pseat-2"></div>
+        <div class="seat seat-r" id="pseat-1"></div>
+        <div class="center-info">
+          <div id="puzzle-log" class="game-log" aria-live="polite"></div>
+        </div>
+        <div class="my-zone">
+          <div class="controls" id="pz-controls">
+            <button id="pz-play" class="btn primary" type="button">出牌</button>
+            <button id="pz-pass" class="btn" type="button">要不起</button>
+            <button id="pz-hint" class="btn" type="button">提示</button>
+          </div>
+          <div id="pz-my-hand" class="my-hand" aria-label="你的手牌"></div>
+        </div>
+      </div>
+      <div class="exit-row">
+        <button id="btn-exit-puzzle" class="btn small ghost" type="button">← 返回菜单</button>
+        <button id="btn-pz-prev" class="btn small" type="button">上一关</button>
+        <button id="btn-pz-next" class="btn small" type="button">下一关</button>
+      </div>
+    </section>
+
+    <div id="flash" class="flash hidden"></div>
+
+    <section class="tips">
+      <h2>玩法说明</h2>
+      <ul>
+        <li><b>经典斗地主</b>：三人各 17 张，叫分（1/2/3 分）最高者当地主并拿 3 张底牌。地主先出，先出完的一方获胜。</li>
+        <li>牌型：单张 / 对子 / 三张 / 三带一 / 三带二 / 顺子（五张起）/ 连对（三对起）/ 飞机（可带翼）/ 炸弹 / 王炸。炸弹和王炸翻倍。</li>
+        <li>大小：3&lt;4&lt;…&lt;K&lt;A&lt;2&lt;小王&lt;大王。结算：地主赢 ±2×底分，农民各 ±底分。</li>
+        <li><b>残局闯关</b>：每关三家手牌全明，你（地主）先出。按最优走法一定存在必胜路线，找到它就能过关；共 12 关，难度递增。</li>
+        <li>本游戏完全免费，不涉及任何充值、金币或抽奖，仅供休闲娱乐。</li>
+      </ul>
+    </section>
+  </main>
+
+  <!-- 结算弹窗 -->
+  <div id="result-modal" class="modal hidden">
+    <div class="modal-box">
+      <h3 id="result-title">本局结束</h3>
+      <div id="result-body"></div>
+      <button id="btn-result-ok" class="btn primary" type="button">确定</button>
+    </div>
+  </div>
+
+  <!-- 时长锁定弹窗 -->
+  <div id="time-lock" class="modal hidden">
+    <div class="modal-box">
+      <h3>今日娱乐时长已用完</h3>
+      <p>游客每天 15 分钟、注册用户 30 分钟（邀好友注册当天可加时）。注册登录解锁更多时长。</p>
+      <a id="lock-login" class="btn primary" href="#">注册 / 登录</a>
+      <button id="lock-close" class="btn" type="button">知道了</button>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <a id="home-link" href="javascript:void(0)">← 返回 DaoBox 工具箱</a>
+    <span class="dot">·</span>
+    <a id="app-home-link" href="./?src=home">🏠 斗地主首页</a>
+    <span class="dot">·</span>
+    <span id="contact-email"></span>
+  </footer>
+  <p class="disclaimer">本游戏为免费休闲娱乐项目，不含任何真实货币交易、赌博或抽奖功能。</p>
+
+  <script>
+    // 联系邮箱运行时拼接（防 Cloudflare obfuscate）
+    (function () {
+      var u = 'support', d = 'daobox.net.cn';
+      document.getElementById('contact-email').innerHTML =
+        '<a href="mailto:' + u + '@' + d + '">' + u + '@' + d + '</a>';
+    })();
+  </script>
+  <script src="rules.js?v=1"></script>
+  <script src="ai.js?v=1"></script>
+  <script src="puzzles.js?v=1"></script>
+  <script src="app.js?v=1"></script>
+  <script>document.write('<script src="' + window.DB_HOME + '/portal.js" data-app="doudizhu"><\/script>');</script>
+  <script>
+    (function () {
+      var login = document.getElementById('lock-login');
+      if (login) login.href = window.DB_HOME + '/login?src=doudizhu';
+      var home = document.getElementById('home-link');
+      if (home) home.href = window.DB_HOME + '?src=doudizhu';
+    })();
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('./service-worker.js').catch(function () {});
+      });
+    }
+  </script>
+</body>
+</html>
