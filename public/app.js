@@ -4,7 +4,7 @@
   var R = window.DDRules;
   var AI = window.DDAI;
   var SFX = window.DDSound;
-  var APP_VERSION = "v0.1.3";
+  var APP_VERSION = "v0.1.4";
   var SAVE_CLASSIC = "dbdoudizhu-classic-v1";
   var SAVE_SCORE = "dbdoudizhu-score-v1";
   var SAVE_UNLOCK = "dbdoudizhu-unlock-v1";
@@ -21,6 +21,7 @@
   var aiTimer = null;
   var locked = false;
   var paused = false;
+  var dragSel = { active: false, mode: "add", last: -1 };
   var pzHintTimer = null;
 
   /* ---------- 工具 ---------- */
@@ -354,17 +355,39 @@
       html += cardHTML(c, cls).replace('<span class="card', '<span data-i="' + i + '" class="card');
     }
     el.innerHTML = html || '<span class="empty-tip">（手牌已出完）</span>';
-    el.querySelectorAll(".card").forEach(function (node) {
-      node.addEventListener("click", function () { onCardClick(parseInt(node.dataset.i, 10), mode); });
-    });
   }
-  function onCardClick(i, mode) {
-    var st = mode === "classic" ? C : P;
-    if (locked || paused || st.turn !== 0) return;
-    if (mode === "classic" && st.phase !== "play") return;
-    if (selected.has(i)) selected.delete(i); else selected.add(i);
-    renderHand(mode);
+
+  /* ---------- 滑动连选：按住划过即选，支持鼠标拖拽与手机滑动 ---------- */
+  function handPointerDown(e) {
+    var container = e.currentTarget;
+    var st = screen === "classic" ? C : P;
+    if (!st || st.turn !== 0 || locked || paused) return;
+    if (screen === "classic" && st.phase !== "play") return;
+    var node = e.target.closest ? e.target.closest(".card") : null;
+    if (!node || node.dataset.i == null) return;
+    try { container.setPointerCapture(e.pointerId); } catch (err) {}
+    var i = parseInt(node.dataset.i, 10);
+    dragSel.active = true;
+    dragSel.last = i;
+    if (selected.has(i)) { selected.delete(i); dragSel.mode = "remove"; }
+    else { selected.add(i); dragSel.mode = "add"; }
+    SFX.play("click");
+    renderHand(screen);
+    e.preventDefault();
   }
+  function handPointerMove(e) {
+    if (!dragSel.active) return;
+    var el = document.elementFromPoint(e.clientX, e.clientY);
+    var node = el && el.closest ? el.closest(".card[data-i]") : null;
+    if (!node) return;
+    var i = parseInt(node.dataset.i, 10);
+    if (i === dragSel.last) return;
+    dragSel.last = i;
+    if (dragSel.mode === "add") selected.add(i); else selected.delete(i);
+    renderHand(screen);
+    e.preventDefault();
+  }
+  function handPointerUp() { dragSel.active = false; }
   function updateButtons(mode) {
     var st = mode === "classic" ? C : P;
     var my = st && st.turn === 0 && !locked && (mode !== "classic" || st.phase === "play");
@@ -701,6 +724,13 @@
     $("pz-play").addEventListener("click", function () { if (P && P.turn === 0) humanPlay("puzzle"); });
     $("pz-pass").addEventListener("click", function () { if (P && P.turn === 0) humanPass("puzzle"); });
     $("pz-hint").addEventListener("click", pzHint);
+    ["my-hand", "pz-my-hand"].forEach(function (id) {
+      var box = $(id);
+      box.addEventListener("pointerdown", handPointerDown);
+      box.addEventListener("pointermove", handPointerMove);
+      box.addEventListener("pointerup", handPointerUp);
+      box.addEventListener("pointercancel", handPointerUp);
+    });
     $("btn-pause").addEventListener("click", togglePause);
     $("pz-pause").addEventListener("click", togglePause);
     $("btn-resume").addEventListener("click", resumeGame);
