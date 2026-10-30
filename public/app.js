@@ -4,7 +4,7 @@
   var R = window.DDRules;
   var AI = window.DDAI;
   var SFX = window.DDSound;
-  var APP_VERSION = "v0.1.5";
+  var APP_VERSION = "v0.1.7";
   var SAVE_CLASSIC = "dbdoudizhu-classic-v1";
   var SAVE_SCORE = "dbdoudizhu-score-v1";
   var SAVE_UNLOCK = "dbdoudizhu-unlock-v1";
@@ -170,7 +170,8 @@
   }
   function becomeLandlord(seat, base) {
     C.landlord = seat; C.base = base; C.multiplier = 1; C.phase = "play";
-    for (var i = 0; i < 3; i++) C.hands[i].push.apply(C.hands[i], C.bottom);
+    // 底牌只归地主（v0.1.7 修复：此前误发给三家且农民手牌不重排，导致末尾出现乱序牌）
+    C.hands[seat].push.apply(C.hands[seat], C.bottom);
     sortHand(C.hands[seat]);
     log(SEAT_NAMES[seat] + " 当地主（底分 " + base + "），拿底牌：" + C.bottom.map(function (c) { return rankText(c.r); }).join(" "));
     C.turn = seat;
@@ -656,7 +657,12 @@
       var restored = null;
       try { restored = JSON.parse(localStorage.getItem(SAVE_CLASSIC)); } catch (e) {}
       if (restored && restored.v === 1 && restored.phase === "play" && restored.hands[0].length > 0) {
+        // 老版本 bug 存档：农民手牌被多发 3 张底牌（追加在末尾），恢复时裁掉
+        for (var i = 0; i < 3; i++) {
+          if (i !== restored.landlord && restored.hands[i].length === 20) restored.hands[i].length = 17;
+        }
         C = restored;
+        sortHand(C.hands[0]);
         show("classic");
         log("已恢复上局进度。");
         renderClassic();
