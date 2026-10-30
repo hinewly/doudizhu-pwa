@@ -168,7 +168,7 @@
   function getMode() { return mode; }
 
   function init() {
-    if (mode === 2) startBGM();
+    // BGM 延迟到首次用户手势再启动（浏览器自动播放限制，同时消除 suspended 警告）
     if (!init._bound) {
       init._bound = true;
       document.addEventListener("pointerdown", function once() {
