@@ -74,6 +74,8 @@
     paused = false;
     $("pause-modal").classList.add("hidden");
     $("menu").classList.toggle("hidden", scr !== "menu");
+    var homeWrap = document.getElementById("app-home-wrap");
+    if (homeWrap) homeWrap.style.display = scr === "menu" ? "none" : "";
     $("classic").classList.toggle("hidden", scr !== "classic");
     $("puzzle").classList.toggle("hidden", scr !== "puzzle");
     if (scr === "menu") {
