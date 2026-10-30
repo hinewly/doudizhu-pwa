@@ -1,5 +1,5 @@
 /* 斗地主 SW v1：静态资源缓存 */
-const CACHE = "dbdoudizhu-v13";
+const CACHE = "dbdoudizhu-v14";
 const ASSETS = [
   "./", "./index.html", "./style.css?v=4", "./rules.js?v=1", "./ai.js?v=1", "./sounds.js?v=4", "./puzzles.js?v=2", "./duel.js?v=1", "./app.js?v=11",
   "./manifest.json", "./icons/favicon.svg",
