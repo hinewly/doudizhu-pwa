@@ -191,6 +191,7 @@
       var idx = ids.indexOf(hand[i].s + hand[i].r);
       if (idx !== -1) { ids.splice(idx, 1); hand.splice(i, 1); }
     }
+    dragSel.sigs = null;
     if (play.type === "bomb" || play.type === "rocket") { C.multiplier *= 2; SFX.play("bomb"); log("💣 翻倍！当前倍数 ×" + C.multiplier); }
     else SFX.play("play");
     C.table[seat] = cards;
@@ -358,21 +359,28 @@
   }
 
   /* ---------- 滑动连选：按住划过即选，支持鼠标拖拽与手机滑动 ---------- */
-  /* 划选加牌是否可入：保证划出来的组合符合扑克牌型规律（如 67889T 只选成 6789T 顺子，多余的 8 跳过） */
-  function dragCanAdd(chosenCards, card) {
-    var test = chosenCards.concat([card]);
-    if (test.length <= 2) return true;
-    var p = R.classify(test);
-    if (p) return true; // 已是完整合法牌型（对/三/三带/炸弹/顺子…）
-    // 未成型但"在推进中"：点数连续、每种牌张数不递增（如 33→334→3344→334455 连对、678→6789 顺子），
-    // 单种最多 3 张、不含 2 和王；跨张数混选（如 6788 的多余 8、3456 混对）会被跳过
-    var counts = R.countsOf(test);
-    var keys = Object.keys(counts).map(Number).sort(function (x, y) { return x - y; });
-    var prev = counts[keys[0]];
-    if (prev > 3) return false;
-    var nonIncreasing = keys.every(function (k) { var c = counts[k]; if (c > prev) return false; prev = c; return true; });
-    var consecutive = keys[keys.length - 1] - keys[0] === keys.length - 1;
-    if (nonIncreasing && consecutive && keys[keys.length - 1] <= 14) return true;
+  /* 划选加牌是否可入：候选(已选+新牌)必须是手牌中某个合法牌型的"子集"——
+     即按点数统计后，每种牌的张数都不超过某个可打出牌型对应张数。
+     这样 67889T 划选会自动跳过多余的 8（不存在含两张 8 的 6-10 顺子），继续划 76 仍能补成完整顺子 */
+  function rebuildPlaySigs(st) {
+    dragSel.sigs = R.allPlays(st.hands[0]).map(function (mv) { return R.countsOf(mv.cards); });
+    dragSel.sigHand = st.hands[0];
+    dragSel.sigLen = st.hands[0].length;
+  }
+  function dragCanAdd(st, card) {
+    var counts = {};
+    Array.from(selected).forEach(function (idx) {
+      var r = st.hands[0][idx].r;
+      counts[r] = (counts[r] || 0) + 1;
+    });
+    counts[card.r] = (counts[card.r] || 0) + 1;
+    if (!dragSel.sigs || dragSel.sigHand !== st.hands[0] || dragSel.sigLen !== st.hands[0].length) rebuildPlaySigs(st);
+    var sigs = dragSel.sigs;
+    for (var i = 0; i < sigs.length; i++) {
+      var sig = sigs[i], ok = true;
+      for (var k in counts) if ((sig[k] || 0) < counts[k]) { ok = false; break; }
+      if (ok) return true;
+    }
     return false;
   }
   function handPointerDown(e) {
@@ -402,8 +410,7 @@
     dragSel.last = i;
     if (dragSel.mode === "add") {
       var st = screen === "classic" ? C : P;
-      var chosen = Array.from(selected).map(function (idx) { return st.hands[0][idx]; });
-      if (!dragCanAdd(chosen, st.hands[0][i])) { e.preventDefault(); return; } // 不合牌型规律，跳过
+      if (!dragCanAdd(st, st.hands[0][i])) { e.preventDefault(); return; } // 不合牌型规律，跳过
       selected.add(i);
     } else {
       selected.delete(i);
