@@ -81,30 +81,32 @@ body {
 .pass-tag { font-size: 12px; color: var(--muted); border: 1px dashed #a34d4d; border-radius: 8px; padding: 2px 8px; display: inline-block; margin-bottom: 6px; }
 .played { display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 6px; min-height: 34px; }
 .backs { display: flex; flex-wrap: wrap; gap: 2px; }
-.backs i { width: 13px; height: 19px; background: linear-gradient(135deg, #2c5aa0, #1d3a6b); border-radius: 2px; border: 1px solid #16294d; }
+.backs i { width: 17px; height: 25px; background: linear-gradient(135deg, #2c5aa0, #1d3a6b); border-radius: 2px; border: 1px solid #16294d; }
 .backs em { color: var(--muted); font-style: normal; font-size: 11px; align-self: center; }
 
 /* 明牌（残局对手） */
-.opencards { display: flex; flex-wrap: wrap; gap: 2px; }
+.opencards { display: flex; flex-wrap: wrap; gap: 3px; }
+.opencards .card.mini { width: 30px; height: 43px; }
+.opencards .card.mini .r { font-size: 14px; }
 
 /* 牌面 */
 .card {
   display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
   background: var(--card-bg); border-radius: 6px; border: 1px solid #d8d2c4;
-  width: 34px; height: 48px; font-weight: 700; line-height: 1.05;
+  width: 46px; height: 66px; font-weight: 700; line-height: 1.05;
   box-shadow: 0 1px 2px rgba(0,0,0,.35); cursor: default; user-select: none;
 }
-.card .r { font-size: 16px; }
-.card .s { font-size: 11px; }
+.card .r { font-size: 21px; }
+.card .s { font-size: 13px; }
 .card.red { color: var(--red); }
 .card.blk { color: var(--black); }
-.card.joker { width: 34px; }
-.card.joker .r { font-size: 11px; letter-spacing: 1px; }
-.card.mini { width: 24px; height: 34px; border-radius: 4px; }
-.card.mini .r { font-size: 12px; }
+.card.joker { width: 46px; }
+.card.joker .r { font-size: 13px; letter-spacing: 1px; }
+.card.mini { width: 34px; height: 48px; border-radius: 5px; }
+.card.mini .r { font-size: 16px; }
 .card.mini .s { display: none; }
-.card.mini.joker .r { font-size: 9px; }
-.card.sel { transform: translateY(-14px); border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold), 0 4px 8px rgba(0,0,0,.4); }
+.card.mini.joker .r { font-size: 12px; }
+.card.sel { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold), 0 4px 8px rgba(0,0,0,.4); }
 .card.canhint { outline: 2px dashed #86efac; outline-offset: 1px; }
 
 /* 底牌 */
@@ -126,7 +128,11 @@ body {
 .btn.primary { background: linear-gradient(180deg, #d97706, #b45309); border-color: #92400e; }
 .btn.ghost { background: transparent; border-color: rgba(245,232,224,.25); color: var(--muted); }
 .btn.small { padding: 5px 12px; font-size: 12px; }
-.my-hand { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; padding: 14px 4px 6px; min-height: 66px; }
+.my-hand { display: flex; flex-wrap: nowrap; justify-content: center; align-items: flex-end; padding: 20px 4px 6px; min-height: 96px; }
+.my-hand .card { margin-left: -20px; transition: transform .12s, box-shadow .12s; }
+.my-hand .card:first-child { margin-left: 0; }
+.my-hand .card:hover { transform: translateY(-10px); z-index: 5; }
+.my-hand .card.sel { transform: translateY(-20px); z-index: 6; }
 .empty-tip { color: var(--muted); font-size: 13px; padding-top: 18px; }
 .exit-row { display: flex; gap: 8px; margin-top: 10px; }
 
@@ -159,6 +165,10 @@ body {
 
 @media (max-width: 640px) {
   .table { min-height: 400px; padding: 8px; grid-template-columns: 1fr 1.4fr 1fr; }
-  .card { width: 30px; height: 43px; }
-  .card.mini { width: 20px; height: 29px; }
+  .card { width: 36px; height: 52px; }
+  .card .r { font-size: 17px; }
+  .card.mini { width: 26px; height: 37px; }
+  .card.mini .r { font-size: 13px; }
+  .my-hand .card { margin-left: -16px; }
+  .my-hand { min-height: 78px; }
 }

@@ -3,7 +3,8 @@
   "use strict";
   var R = window.DDRules;
   var AI = window.DDAI;
-  var APP_VERSION = "v0.1.0";
+  var SFX = window.DDSound;
+  var APP_VERSION = "v0.1.1";
   var SAVE_CLASSIC = "dbdoudizhu-classic-v1";
   var SAVE_SCORE = "dbdoudizhu-score-v1";
   var SAVE_UNLOCK = "dbdoudizhu-unlock-v1";
@@ -96,6 +97,7 @@
     C.bottom = deck.slice(51);
     C.table = [null, null, null]; C.passFlags = [false, false, false]; C.trick = null;
     selected.clear(); hintIdx = 0;
+    SFX.play("deal");
     if (C.phase === "play") { C.turn = C.landlord; log("重新发牌。地主：" + SEAT_NAMES[C.landlord] + "（底分 " + C.base + "）"); }
     else { log("发牌完毕，从 " + SEAT_NAMES[C.bidTurn] + " 开始叫分。"); }
     renderClassic();
@@ -148,6 +150,7 @@
   }
   function applyBid(seat, b) {
     C.bidCount++;
+    if (b > 0) SFX.play("bid");
     if (b > C.bidHighest) { C.bidHighest = b; C.bidWinner = seat; }
     log(SEAT_NAMES[seat] + (b === 0 ? " 不叫" : " 叫 " + b + " 分"));
     if (b === 3 || C.bidCount >= 3) {
@@ -184,7 +187,8 @@
       var idx = ids.indexOf(hand[i].s + hand[i].r);
       if (idx !== -1) { ids.splice(idx, 1); hand.splice(i, 1); }
     }
-    if (play.type === "bomb" || play.type === "rocket") { C.multiplier *= 2; log("💣 翻倍！当前倍数 ×" + C.multiplier); }
+    if (play.type === "bomb" || play.type === "rocket") { C.multiplier *= 2; SFX.play("bomb"); log("💣 翻倍！当前倍数 ×" + C.multiplier); }
+    else SFX.play("play");
     C.table[seat] = cards;
     C.passFlags = [false, false, false];
     C.trick = { play: play, seat: seat, passes: 0, cards: cards.length };
@@ -198,6 +202,7 @@
   }
   function doPass(seat) {
     if (!C.trick || C.trick.seat === seat) return;
+    SFX.play("pass");
     C.trick.passes++;
     C.passFlags[seat] = true;
     C.table[seat] = null;
@@ -222,6 +227,7 @@
     if (isLL) delta = winner === 0 ? 2 * C.base * C.multiplier : -2 * C.base * C.multiplier;
     else delta = winner === 0 ? C.base * C.multiplier : -C.base * C.multiplier;
     addScore(delta);
+    SFX.play(delta > 0 ? "win" : "lose");
     save();
     var box = $("result-modal");
     $("result-title").textContent = delta > 0 ? "🎉 你赢了！" : "惜败";
@@ -428,6 +434,7 @@
   }
   function pzDoPass(seat) {
     if (!P.trick || P.trick.seat === seat) return;
+    SFX.play("pass");
     P.trick.passes++;
     P.passFlags[seat] = true;
     P.table[seat] = null;
@@ -449,12 +456,14 @@
     var lv = P.lv;
     if (lv >= loadUnlock()) saveUnlock(Math.min(lv + 1, window.DDPuzzles.length + 1));
     save();
+    SFX.play("unlock");
     $("result-title").textContent = "🎉 第 " + lv + " 关通关！";
     $("result-body").innerHTML = "<p>" + (lv < window.DDPuzzles.length ? "已解锁第 " + (lv + 1) + " 关。" : "全部 12 关通关，太强了！") + "</p>";
     $("btn-result-ok").dataset.action = "puzzle-next";
     $("result-modal").classList.remove("hidden");
   }
   function puzzleFail() {
+    SFX.play("lose");
     $("result-title").textContent = "惜败";
     $("result-body").innerHTML = "<p>对手先出完了。残局一定有必胜路线，再想想？</p>";
     $("btn-result-ok").dataset.action = "puzzle-retry";
@@ -604,8 +613,16 @@
   window.addEventListener("daobox:timeexceeded", applyTimeLock);
 
   /* ---------- 事件绑定 / 启动 ---------- */
+  function updateSoundBtn() {
+    var m = SFX.getMode();
+    $("sound-btn").textContent = m === 2 ? "🔊" : (m === 1 ? "🎵" : "🔇");
+    $("sound-btn").title = m === 2 ? "声音：全开（点一下→仅音效）" : (m === 1 ? "声音：仅音效（点一下→静音）" : "声音：静音（点一下→全开）");
+  }
   function boot() {
     $("app-version").textContent = APP_VERSION;
+    SFX.init();
+    updateSoundBtn();
+    $("sound-btn").addEventListener("click", function () { SFX.toggle(); updateSoundBtn(); SFX.play("click"); });
     $("refresh-btn").addEventListener("click", function () {
       if ("caches" in window) {
         caches.keys().then(function (keys) {

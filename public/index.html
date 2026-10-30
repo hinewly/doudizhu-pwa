@@ -14,13 +14,13 @@
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <meta name="theme-color" content="#7f1d1d">
-  <link rel="stylesheet" href="style.css?v=1">
+  <link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
   <header class="topbar">
     <div class="topbar-inner">
       <div class="brand">🃏 斗地主</div>
-      <div class="topbar-tools"><span class="version-badge" id="app-version">v0.1.0</span><button class="refresh-btn" id="refresh-btn" type="button" title="强制刷新 · 清缓存重载" aria-label="强制刷新">↻</button></div>
+      <div class="topbar-tools"><span class="version-badge" id="app-version">v0.1.1</span><button class="refresh-btn" id="sound-btn" type="button" title="声音：全开 / 仅音效 / 静音" aria-label="声音开关">🔊</button><button class="refresh-btn" id="refresh-btn" type="button" title="强制刷新 · 清缓存重载" aria-label="强制刷新">↻</button></div>
       <div class="topbar-slot" id="db-account-slot"></div>
     </div>
   </header>
@@ -159,8 +159,9 @@
   </script>
   <script src="rules.js?v=1"></script>
   <script src="ai.js?v=1"></script>
+  <script src="sounds.js?v=1"></script>
   <script src="puzzles.js?v=1"></script>
-  <script src="app.js?v=1"></script>
+  <script src="app.js?v=2"></script>
   <script>document.write('<script src="' + window.DB_HOME + '/portal.js" data-app="doudizhu"><\/script>');</script>
   <script>
     (function () {
