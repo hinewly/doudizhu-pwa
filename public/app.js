@@ -91,6 +91,7 @@
       hands: [[], [], []], bottom: [],
       bidTurn: Math.floor(Math.random() * 3), bidHighest: 0, bidWinner: -1, bidCount: 0,
       landlord: -1, base: 0, multiplier: 1,
+      landlordPlays: 0,
       turn: 0, trick: null, table: [null, null, null], passFlags: [false, false, false]
     };
     deal();
@@ -197,6 +198,7 @@
     C.table[seat] = cards;
     C.passFlags = [false, false, false];
     C.trick = { play: play, seat: seat, passes: 0, cards: cards.length };
+    if (seat === C.landlord) C.landlordPlays++;
     log(SEAT_NAMES[seat] + " 出 " + playText(play));
     if (hand.length === 0) { endClassic(seat); return true; }
     C.turn = (seat + 1) % 3;
@@ -226,8 +228,16 @@
     renderClassic();
     scheduleAI();
   }
+  // 春天/反春判定（纯函数便于测试）：春天=地主赢且两农民一张未出；反春=农民赢且地主只出过一手
+  function springType(isLL, left1, left2, landlordPlays) {
+    if (isLL && left1 === 17 && left2 === 17) return "spring";
+    if (!isLL && landlordPlays === 1) return "anti";
+    return null;
+  }
   function endClassic(winner) {
     var isLL = winner === C.landlord;
+    var spring = springType(isLL, C.hands[(C.landlord + 1) % 3].length, C.hands[(C.landlord + 2) % 3].length, C.landlordPlays);
+    if (spring) C.multiplier *= 2;
     var delta;
     if (isLL) delta = winner === 0 ? 2 * C.base * C.multiplier : -2 * C.base * C.multiplier;
     else delta = winner === 0 ? C.base * C.multiplier : -C.base * C.multiplier;
@@ -238,6 +248,8 @@
     $("result-title").textContent = delta > 0 ? "🎉 你赢了！" : "惜败";
     $("result-body").innerHTML =
       "<p>" + SEAT_NAMES[winner] + "（" + (isLL ? "地主" : "农民") + "）先出完。</p>" +
+      (spring === "spring" ? "<p>🌸 春天！两农民一张未出，倍数翻倍</p>" : "") +
+      (spring === "anti" ? "<p>🍃 反春！地主只出过一手，倍数翻倍</p>" : "") +
       "<p>底分 " + C.base + " × 倍数 " + C.multiplier + "</p>" +
       "<p>积分变化：" + (delta > 0 ? "+" : "") + delta + "</p>";
     $("btn-result-ok").dataset.action = "classic";
