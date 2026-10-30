@@ -8,7 +8,7 @@
   var SAVE_CLASSIC = "dbdoudizhu-classic-v1";
   var SAVE_SCORE = "dbdoudizhu-score-v1";
   var SAVE_UNLOCK = "dbdoudizhu-unlock-v1";
-  var SAVE_PZ = "dbdoudizhu-puzzle-v1";
+  var SAVE_PZ = "dbdoudizhu-puzzle-v2";
   var SEAT_NAMES = ["你", "下家", "上家"];
   var SUITS = ["S", "H", "D", "C"];
   var $ = function (id) { return document.getElementById(id); };
@@ -451,15 +451,16 @@
     } catch (e) {}
   }
 
-  /* ================= 残局模式 ================= */
+  /* ================= 残局模式（v0.2.0 方案 A：1v1 大残局，参考 naturalleo/doudizhu_endgame） ================= */
+  var PZ_NAMES = ["你", "对手"];
   function startPuzzle(lv) {
     var data = window.DDPuzzles[lv - 1];
-    P = { lv: lv, hands: [decodeHand(data.player), decodeHand(data.ai1), decodeHand(data.ai2)], turn: 0, trick: null, table: [null, null, null], passFlags: [false, false, false], solved: false };
-    sortHand(P.hands[0]); sortHand(P.hands[1]); sortHand(P.hands[2]);
+    P = { lv: lv, hands: [decodeHand(data.player), decodeHand(data.ai)], turn: 0, trick: null, table: [null, null], passFlags: [false, false], solved: false };
+    sortHand(P.hands[0]); sortHand(P.hands[1]);
     selected.clear(); hintIdx = 0;
     $("pz-level").textContent = "第 " + lv + " 关";
     $("puzzle-log").innerHTML = "";
-    pzLog("第 " + lv + " 关：你先出，出完即胜。对手手牌全明。");
+    pzLog("第 " + lv + " 关：你先出，出完即胜。对手手牌全明（" + P.hands[1].length + " 张）。");
     save();
     renderPuzzle();
     schedulePzAI();
@@ -467,18 +468,21 @@
   function schedulePzAI() {
     clearTimeout(aiTimer);
     if (!P || locked || paused || screen !== "puzzle" || P.turn === 0) return;
-    var seat = P.turn;
     aiTimer = setTimeout(function () {
-      if (!P || P.turn !== seat || locked || screen !== "puzzle") return;
-      var ctx = { mySeat: seat, landlordSeat: 0, landlordLeft: P.hands[0].length, peasantMinLeft: Math.min(P.hands[(seat + 1) % 3].length, P.hands[(seat + 2) % 3].length), oppMin: minOppPz(seat) };
-      var mv = AI.decide(P.hands[seat], P.trick, ctx);
-      if (mv) pzDoPlay(seat, mv.cards); else pzDoPass(seat);
+      if (!P || P.turn !== 1 || locked || screen !== "puzzle" || paused) return;
+      // 求解器最优防守：有必胜线就赢，否则最小代价拖延
+      try {
+        var my = cardsToCounts(P.hands[1]), opp = cardsToCounts(P.hands[0]);
+        var bm = DoudizhuDuel.bestMove(my, opp, P.trick, 500000);
+        if (bm && bm.pass) { pzDoPass(1); return; }
+        if (bm) { pzDoPlay(1, realCards(P.hands[1], bm.cards)); return; }
+      } catch (e) { /* 超时兜底：启发式 */ }
+      var opts = P.trick ? R.responses(P.hands[1], P.trick) : R.allPlays(P.hands[1]);
+      if (opts.length) {
+        var pick = opts.reduce(function (a, b) { return b.cards.length < a.cards.length ? b : a; });
+        pzDoPlay(1, pick.cards);
+      } else pzDoPass(1);
     }, 800);
-  }
-  function minOppPz(seat) {
-    var m = Infinity;
-    for (var s = 1; s < 3; s++) if (s !== seat) m = Math.min(m, P.hands[s].length);
-    return m === Infinity ? null : m;
   }
   function pzDoPlay(seat, cards) {
     var hand = P.hands[seat];
@@ -491,14 +495,14 @@
       if (idx !== -1) { ids.splice(idx, 1); hand.splice(i, 1); }
     }
     P.table[seat] = cards;
-    P.passFlags = [false, false, false];
+    P.passFlags = [false, false];
     P.trick = { play: play, seat: seat, passes: 0, cards: cards.length };
-    pzLog(SEAT_NAMES[seat] + " 出 " + playText(play));
+    pzLog(PZ_NAMES[seat] + " 出 " + playText(play));
     if (hand.length === 0) {
       if (seat === 0) puzzleWin(); else puzzleFail();
       return true;
     }
-    P.turn = (seat + 1) % 3;
+    P.turn = 1 - seat;
     save();
     renderPuzzle();
     schedulePzAI();
@@ -507,19 +511,15 @@
   function pzDoPass(seat) {
     if (!P.trick || P.trick.seat === seat) return;
     SFX.play("pass");
-    P.trick.passes++;
     P.passFlags[seat] = true;
     P.table[seat] = null;
-    pzLog(SEAT_NAMES[seat] + " 要不起");
-    if (P.trick.passes >= 2) {
-      P.turn = P.trick.seat;
-      P.trick = null;
-      P.table = [null, null, null];
-      selected.clear();
-      pzLog("— " + SEAT_NAMES[P.turn] + " 继续出牌 —");
-    } else {
-      P.turn = (seat + 1) % 3;
-    }
+    pzLog(PZ_NAMES[seat] + " 要不起");
+    // 1v1：一家过即收墩，赢墩者重新领出
+    P.turn = P.trick.seat;
+    P.trick = null;
+    P.table = [null, null];
+    selected.clear();
+    pzLog("— " + PZ_NAMES[P.turn] + " 继续出牌 —");
     save();
     renderPuzzle();
     schedulePzAI();
@@ -530,7 +530,7 @@
     save();
     SFX.play("unlock");
     $("result-title").textContent = "🎉 第 " + lv + " 关通关！";
-    $("result-body").innerHTML = "<p>" + (lv < window.DDPuzzles.length ? "已解锁第 " + (lv + 1) + " 关。" : "全部 12 关通关，太强了！") + "</p>";
+    $("result-body").innerHTML = "<p>" + (lv < window.DDPuzzles.length ? "已解锁第 " + (lv + 1) + " 关。" : "全部 " + window.DDPuzzles.length + " 关通关，太强了！") + "</p>";
     $("btn-result-ok").dataset.action = "puzzle-next";
     $("result-modal").classList.remove("hidden");
   }
@@ -544,18 +544,15 @@
   function renderPuzzle() {
     if (!P) return;
     $("pz-info").textContent = P.trick
-      ? "桌面：" + playText(P.trick.play) + "（" + SEAT_NAMES[P.trick.seat] + "）· 轮到 " + SEAT_NAMES[P.turn]
-      : (P.turn === 0 ? "轮到你先出" : SEAT_NAMES[P.turn] + " 思考中…");
-    for (var s = 1; s < 3; s++) {
-      var el = $("pseat-" + s);
-      var n = P.hands[s].length;
-      var mine = P.turn === s;
-      var html = '<div class="seat-head' + (mine ? " active" : "") + '"><b>' + SEAT_NAMES[s] + "</b><span>" + n + " 张</span></div>";
-      if (P.passFlags[s]) html += '<div class="pass-tag">要不起</div>';
-      else if (P.table[s]) html += '<div class="played">' + P.table[s].map(function (c) { return cardHTML(c, "mini"); }).join("") + "</div>";
-      html += '<div class="opencards">' + P.hands[s].map(function (c) { return cardHTML(c, "mini"); }).join("") + "</div>";
-      el.innerHTML = html;
-    }
+      ? "桌面：" + playText(P.trick.play) + "（" + PZ_NAMES[P.trick.seat] + "）· 轮到 " + PZ_NAMES[P.turn]
+      : (P.turn === 0 ? "轮到你先出" : PZ_NAMES[1] + " 思考中…");
+    var el = $("pseat-1");
+    var n = P.hands[1].length;
+    var html = '<div class="seat-head' + (P.turn === 1 ? " active" : "") + '"><b>' + PZ_NAMES[1] + "（明牌）</b><span>" + n + " 张</span></div>";
+    if (P.passFlags[1]) html += '<div class="pass-tag">要不起</div>';
+    else if (P.table[1]) html += '<div class="played">' + P.table[1].map(function (c) { return cardHTML(c, "mini"); }).join("") + "</div>";
+    html += '<div class="opencards">' + P.hands[1].map(function (c) { return cardHTML(c, "mini"); }).join("") + "</div>";
+    el.innerHTML = html;
     renderHand("puzzle");
     updateButtons("puzzle");
     $("btn-pz-prev").disabled = P.lv <= 1;
@@ -569,10 +566,11 @@
       try {
         var mv = solverBestMove();
         if (!mv) { flashMsg("当前局面没有必胜着法（之前可能已走偏），试试重进本关"); return; }
+        if (mv.pass) { flashMsg("提示：这轮要不起，先过"); return; }
         selected.clear();
-        mv.cards.forEach(function (c) {
+        realCards(P.hands[0], mv.cards).forEach(function (c) {
           for (var i = 0; i < P.hands[0].length; i++)
-            if (P.hands[0][i].s === c.s && P.hands[0][i].r === c.r) { selected.add(i); break; }
+            if (P.hands[0][i] === c) { selected.add(i); break; }
         });
         renderHand("puzzle");
         flashMsg("必胜着法已标出（绿色虚线）");
@@ -580,101 +578,24 @@
     }, 50);
   }
   function solverBestMove() {
-    // 动态加载求解器逻辑（浏览器内置精简版）
-    var counts = P.hands.map(cardsToCounts);
-    var moves = P.trick ? R.responses(P.hands[0], P.trick) : R.allPlays(P.hands[0]);
-    // 先试能不能直接出完
-    for (var i = 0; i < moves.length; i++) if (moves[i].cards.length === P.hands[0].length) return moves[i];
-    // 逐个试，找必胜着
-    var capped = moves.slice(0, 40);
-    for (var j = 0; j < capped.length; j++) {
-      var mv = capped[j];
-      var h = counts.map(function (m) { return JSON.parse(JSON.stringify(m)); });
-      applyCounts(h[0], mv.cards);
-      var nk = { type: mv.play.type, rank: mv.play.rank, len: mv.play.len, seat: 0, passes: 0 };
-      if (pzSolve(h, 1, nk)) return mv;
+    var my = cardsToCounts(P.hands[0]), opp = cardsToCounts(P.hands[1]);
+    return DoudizhuDuel.bestMove(my, opp, P.trick, 3000000);
+  }
+  // 求解器占位牌（s:"S"/"J"，仅点数有意义）→ 真实手牌对象（按点数一次性消耗）
+  function realCards(hand, solverCards) {
+    var used = {}, out = [];
+    for (var i = 0; i < solverCards.length; i++) {
+      var c = solverCards[i];
+      for (var j = 0; j < hand.length; j++) {
+        if (used[j]) continue;
+        if (hand[j].r === c.r && (c.r >= 16 ? hand[j].s === "J" : true)) { used[j] = 1; out.push(hand[j]); break; }
+      }
     }
-    if (!P.trick) return null;
-    // 试试"过"
-    var passes = P.trick.passes + 1;
-    var h2 = counts.map(function (m) { return JSON.parse(JSON.stringify(m)); });
-    var nt, nk2;
-    if (passes >= 2) { nk2 = null; nt = P.trick.seat; }
-    else { nk2 = { type: P.trick.type, rank: P.trick.rank, len: P.trick.len, seat: P.trick.seat, passes: passes }; nt = 1; }
-    if (pzSolve(h2, nt, nk2)) return { cards: [], pass: true };
-    return null;
+    return out;
   }
   function cardsToCounts(cards) { var m = {}; for (var c of cards) m[c.r] = (m[c.r] || 0) + 1; return m; }
   function applyCounts(m, cards) { for (var c of cards) { m[c.r]--; if (!m[c.r]) delete m[c.r]; } }
   function totalM(m) { var t = 0; for (var k in m) t += m[k]; return t; }
-  function cloneM(m) { var o = {}; for (var k in m) o[k] = m[k]; return o; }
-  function countsToCardList(m) { var out = []; for (var k in m) for (var i = 0; i < m[k]; i++) out.push({ s: "S", r: +k }); return out; }
-  function movesForM(m, trick) {
-    var cards = countsToCardList(m);
-    return trick ? R.responses(cards, trick) : R.allPlays(cards);
-  }
-  function pzSolve(hands, turn, trick) {
-    var memo = new Map(), nodes = 0, CAP = 300000;
-    function rec(hands, turn, trick) {
-      nodes++;
-      if (nodes > CAP) throw new Error("cap");
-      if (totalM(hands[0]) === 0) return true;
-      if (totalM(hands[1]) === 0 || totalM(hands[2]) === 0) return false;
-      var me = turn === 0;
-      var key = JSON.stringify([hands[0], hands[1], hands[2], me ? "P" : "A", trick ? [trick.type, trick.rank, trick.len, trick.seat, trick.passes] : null]);
-      if (memo.has(key)) return memo.get(key);
-      var m = hands[turn];
-      var moves = movesForM(m, trick);
-      var result;
-      if (me) {
-        result = false;
-        var opts = [];
-        for (var mv of moves) opts.push({ mv: mv, pass: false });
-        if (trick) opts.push({ mv: null, pass: true });
-        for (var opt of opts) {
-          var won = false;
-          if (opt.pass) {
-            var passes = (trick.passes || 0) + 1;
-            var nt0, nk0;
-            if (passes >= 2) { nk0 = null; nt0 = trick.seat; }
-            else { nk0 = { type: trick.type, rank: trick.rank, len: trick.len, seat: trick.seat, passes: passes }; nt0 = (turn + 1) % 3; }
-            won = rec(hands, nt0, nk0);
-          } else {
-            applyCounts(m, opt.mv.cards);
-            if (totalM(m) === 0) won = true;
-            else won = rec(hands, (turn + 1) % 3, { type: opt.mv.play.type, rank: opt.mv.play.rank, len: opt.mv.play.len, seat: turn, passes: 0 });
-            for (var c2 of opt.mv.cards) m[c2.r] = (m[c2.r] || 0) + 1; // undo
-          }
-          if (won) { result = true; break; }
-        }
-      } else {
-        result = true;
-        var opts2 = [];
-        if (trick) { for (var mv2 of moves) opts2.push({ mv: mv2, pass: false }); opts2.push({ mv: null, pass: true }); }
-        else { for (var mv3 of moves) opts2.push({ mv: mv3, pass: false }); }
-        if (!opts2.length) result = false;
-        for (var opt2 of opts2) {
-          var h2 = [cloneM(hands[0]), cloneM(hands[1]), cloneM(hands[2])];
-          var nt2, nk2;
-          if (opt2.pass) {
-            nt2 = (turn + 1) % 3;
-            var passes2 = (trick.passes || 0) + 1;
-            if (passes2 >= 2) { nk2 = null; nt2 = trick.seat; }
-            else nk2 = { type: trick.type, rank: trick.rank, len: trick.len, seat: trick.seat, passes: passes2 };
-          } else {
-            applyCounts(h2[turn], opt2.mv.cards);
-            if (totalM(h2[turn]) === 0) { result = false; break; }
-            nt2 = (turn + 1) % 3;
-            nk2 = { type: opt2.mv.play.type, rank: opt2.mv.play.rank, len: opt2.mv.play.len, seat: turn, passes: 0 };
-          }
-          if (!rec(h2, nt2, nk2)) { result = false; break; }
-        }
-      }
-      memo.set(key, result);
-      return result;
-    }
-    return rec(hands, turn, trick);
-  }
 
   /* ---------- 暂停 ---------- */
   function togglePause() {
