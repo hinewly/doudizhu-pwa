@@ -4,7 +4,7 @@
   var R = window.DDRules;
   var AI = window.DDAI;
   var SFX = window.DDSound;
-  var APP_VERSION = "v0.1.7";
+  var APP_VERSION = "v0.1.8";
   var SAVE_CLASSIC = "dbdoudizhu-classic-v1";
   var SAVE_SCORE = "dbdoudizhu-score-v1";
   var SAVE_UNLOCK = "dbdoudizhu-unlock-v1";
@@ -651,8 +651,8 @@
       if ("caches" in window) {
         caches.keys().then(function (keys) {
           return Promise.all(keys.map(function (k) { return caches.delete(k); }));
-        }).finally(function () { location.reload(); });
-      } else location.reload();
+        }).finally(function () { location.replace(location.pathname + (location.search ? location.search + "&" : "?") + "_t=" + Date.now()); });
+      } else location.replace(location.pathname + (location.search ? location.search + "&" : "?") + "_t=" + Date.now());
     });
     $("btn-mode-classic").addEventListener("click", function () {
       // 有进行中的对局则恢复，否则新开
