@@ -25,7 +25,7 @@ DaoBox 家族第 14 个应用：经典斗地主（单人 + AI 对手）+ 残局�
 - `tools/solver.mjs` 博弈树求解器（记忆化，与暴力参照 300 局全对拍）
 - `tools/gen-puzzles.mjs` 关卡生成器（随机发牌 → 求解器验证必胜 → 输出 `public/puzzles.js`）
 - 牌局进度/积分/关卡解锁 localStorage 本机存档
-- 接入 DaoBox portal 时长体系（游客 15 分/天、注册 30 分/天，邀好友可加时）
+- 接入 DaoBox portal 时长体系（游客 10 分/天、注册免费用户 20 分/天，邀好友可加时，会员不限时）
 
 ## 本地开发
 
