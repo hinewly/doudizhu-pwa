@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://doudizhu.daobox.net.cn/sitemap.xml
