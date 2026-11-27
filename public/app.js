@@ -4,7 +4,7 @@
   var R = window.DDRules;
   var AI = window.DDAI;
   var SFX = window.DDSound;
-  var APP_VERSION = "v0.1.14";
+  var APP_VERSION = "v0.1.15";
   var SAVE_CLASSIC = "dbdoudizhu-classic-v1";
   var SAVE_SCORE = "dbdoudizhu-score-v1";
   var SAVE_UNLOCK = "dbdoudizhu-unlock-v1";
@@ -23,6 +23,12 @@
   var paused = false;
   var dragSel = { active: false, mode: "add", last: -1 };
   var pzHintTimer = null;
+  var gameSync = null;
+  var scoreCache = 0;
+  var unlockCache = 1;
+  var scoreUpdatedAt = 0;
+  var soundUpdatedAt = 0;
+  var applyingSync = false;
 
   /* ---------- 工具 ---------- */
   function decodeHand(str) {
@@ -41,10 +47,105 @@
   function sortHand(hand) {
     hand.sort(function (a, b) { return b.r - a.r || (a.s + a.r).localeCompare(b.s + b.r); });
   }
-  function loadScore() { try { return parseInt(localStorage.getItem(SAVE_SCORE), 10) || 0; } catch (e) { return 0; } }
-  function addScore(d) { try { localStorage.setItem(SAVE_SCORE, String(loadScore() + d)); } catch (e) {} }
-  function loadUnlock() { try { return Math.min(parseInt(localStorage.getItem(SAVE_UNLOCK), 10) || 1, window.DDPuzzles.length); } catch (e) { return 1; } }
-  function saveUnlock(n) { try { localStorage.setItem(SAVE_UNLOCK, String(n)); } catch (e) {} }
+  function collectState() {
+    return {
+      records: { score: scoreCache || 0, unlockedLevel: unlockCache || 1, scoreUpdatedAt: scoreUpdatedAt || 0 },
+      active: {
+        classic: C ? { state: C, updatedAt: Number(C.__savedAt) || 0 } : null,
+        puzzle: P ? { state: P, updatedAt: Number(P.__savedAt) || 0 } : null
+      },
+      settings: { soundMode: SFX ? SFX.getMode() : 2, updatedAt: soundUpdatedAt || 0 }
+    };
+  }
+  function readLegacyState() {
+    var classic = null, puzzle = null;
+    try { classic = JSON.parse(localStorage.getItem(SAVE_CLASSIC) || "null"); } catch (e) {}
+    try { puzzle = JSON.parse(localStorage.getItem(SAVE_PZ) || "null"); } catch (e) {}
+    var score = loadLegacyScore();
+    var unlock = loadLegacyUnlock();
+    var sound = loadLegacySound();
+    if (!classic && !puzzle && !score && unlock <= 1 && sound === 2) return null;
+    return {
+      records: { score: score, unlockedLevel: unlock, scoreUpdatedAt: 0 },
+      active: {
+        classic: classic ? { state: classic, updatedAt: 0 } : null,
+        puzzle: puzzle ? { state: puzzle, updatedAt: 0 } : null
+      },
+      settings: { soundMode: sound, updatedAt: 0 }
+    };
+  }
+  function loadLegacyScore() { try { return parseInt(localStorage.getItem(SAVE_SCORE), 10) || 0; } catch (e) { return 0; } }
+  function loadLegacyUnlock() { try { return Math.min(parseInt(localStorage.getItem(SAVE_UNLOCK), 10) || 1, window.DDPuzzles.length); } catch (e) { return 1; } }
+  function loadLegacySound() { try { var n = parseInt(localStorage.getItem("dbdoudizhu-sound-v2"), 10); return Number.isFinite(n) ? n : 2; } catch (e) { return 2; } }
+  function pickActive(a, b) {
+    if (!a) return b || null;
+    if (!b) return a;
+    return (Number(b.updatedAt) || 0) > (Number(a.updatedAt) || 0) ? b : a;
+  }
+  function mergeState(local, remote) {
+    local = local || {}; remote = remote || {};
+    var lr = local.records || {}, rr = remote.records || {};
+    var ls = local.settings || {}, rs = remote.settings || {};
+    var score = rr.score;
+    if ((Number(lr.scoreUpdatedAt) || 0) > (Number(rr.scoreUpdatedAt) || 0)) score = lr.score;
+    else if ((Number(lr.scoreUpdatedAt) || 0) === (Number(rr.scoreUpdatedAt) || 0) && lr.scoreUpdatedAt) score = rr.score;
+    if (score === undefined) score = lr.score || 0;
+    var settings = (Number(rs.updatedAt) || 0) > (Number(ls.updatedAt) || 0) ? rs : ls;
+    return {
+      records: {
+        score: Number(score) || 0,
+        unlockedLevel: Math.max(Number(lr.unlockedLevel) || 1, Number(rr.unlockedLevel) || 1),
+        scoreUpdatedAt: Math.max(Number(lr.scoreUpdatedAt) || 0, Number(rr.scoreUpdatedAt) || 0)
+      },
+      active: {
+        classic: pickActive(local.active && local.active.classic, remote.active && remote.active.classic),
+        puzzle: pickActive(local.active && local.active.puzzle, remote.active && remote.active.puzzle)
+      },
+      settings: {
+        soundMode: Number(settings.soundMode) === 0 || Number(settings.soundMode) === 1 ? Number(settings.soundMode) : 2,
+        updatedAt: Number(settings.updatedAt) || 0
+      }
+    };
+  }
+  function applyState(d) {
+    d = d || {};
+    var r = d.records || {}, s = d.settings || {};
+    scoreCache = Number(r.score) || 0;
+    unlockCache = Math.max(1, Math.min(Number(r.unlockedLevel) || 1, window.DDPuzzles.length + 1));
+    scoreUpdatedAt = Number(r.scoreUpdatedAt) || 0;
+    C = d.active && d.active.classic && d.active.classic.state ? d.active.classic.state : null;
+    P = d.active && d.active.puzzle && d.active.puzzle.state ? d.active.puzzle.state : null;
+    soundUpdatedAt = Number(s.updatedAt) || 0;
+    if (SFX) {
+      applyingSync = true;
+      try { SFX.setMode(Number(s.soundMode) || 0); } catch (e) {}
+      applyingSync = false;
+    }
+    if ($("sound-btn")) $("sound-btn").textContent = SFX.getMode() === 2 ? "🔊" : (SFX.getMode() === 1 ? "🎵" : "🔇");
+  }
+  function initSync() {
+    if (gameSync || !window.DaoBoxCloud) return;
+    gameSync = window.DaoBoxCloud.create({
+      app: "doudizhu", schemaVersion: 1,
+      readLegacy: readLegacyState, collect: collectState, apply: applyState, merge: mergeState,
+      isEmpty: function (d) {
+        return !d || (!Number(d.records && d.records.score) &&
+          !(Number(d.records && d.records.unlockedLevel) > 1) &&
+          !(d.active && (d.active.classic || d.active.puzzle)));
+      }
+    });
+  }
+  function loadScore() { return gameSync ? scoreCache : loadLegacyScore(); }
+  function addScore(d) {
+    scoreCache = loadScore() + d;
+    scoreUpdatedAt = Date.now();
+    if (!gameSync) { try { localStorage.setItem(SAVE_SCORE, String(scoreCache)); } catch (e) {} }
+  }
+  function loadUnlock() { return gameSync ? unlockCache : loadLegacyUnlock(); }
+  function saveUnlock(n) {
+    unlockCache = Math.max(loadUnlock(), n);
+    if (!gameSync) { try { localStorage.setItem(SAVE_UNLOCK, String(unlockCache)); } catch (e) {} }
+  }
 
   /* ---------- 牌面 ---------- */
   function rankText(r) {
@@ -448,10 +549,16 @@
     }
   }
   function save() {
-    try {
-      if (C) localStorage.setItem(SAVE_CLASSIC, JSON.stringify(C));
-      if (P) localStorage.setItem(SAVE_PZ, JSON.stringify(P));
-    } catch (e) {}
+    if (gameSync) {
+      if (C) C.__savedAt = Date.now();
+      if (P) P.__savedAt = Date.now();
+      gameSync.save(collectState());
+    } else {
+      try {
+        if (C) localStorage.setItem(SAVE_CLASSIC, JSON.stringify(C));
+        if (P) localStorage.setItem(SAVE_PZ, JSON.stringify(P));
+      } catch (e) {}
+    }
   }
 
   /* ================= 残局模式（v0.2.0 方案 A：1v1 大残局，参考 naturalleo/doudizhu_endgame） ================= */
@@ -639,9 +746,17 @@
     $("sound-btn").textContent = m === 2 ? "🔊" : (m === 1 ? "🎵" : "🔇");
     $("sound-btn").title = m === 2 ? "声音：全开（点一下→仅音效）" : (m === 1 ? "声音：仅音效（点一下→静音）" : "声音：静音（点一下→全开）");
   }
+  window.addEventListener("dbdoudizhu:soundchange", function () {
+    if (applyingSync) return;
+    soundUpdatedAt = Date.now();
+    save();
+  });
   function boot() {
     $("app-version").textContent = APP_VERSION;
     SFX.init();
+    initSync();
+    var local = gameSync ? gameSync.read() : readLegacyState();
+    if (local) applyState(local);
     updateSoundBtn();
     setTimeout(function () {
       if (SFX.getMode() === 2 && screen === "menu") flashMsg("🎵 音乐已就绪 · 点击屏幕任意处开始播放");
@@ -656,8 +771,7 @@
     });
     $("btn-mode-classic").addEventListener("click", function () {
       // 有进行中的对局则恢复，否则新开
-      var restored = null;
-      try { restored = JSON.parse(localStorage.getItem(SAVE_CLASSIC)); } catch (e) {}
+      var restored = C;
       if (restored && restored.v === 1 && restored.phase === "play" && restored.hands[0].length > 0) {
         // 老版本 bug 存档：农民手牌被多发 3 张底牌（追加在末尾），恢复时裁掉
         for (var i = 0; i < 3; i++) {
@@ -676,10 +790,18 @@
     });
     $("btn-mode-puzzle").addEventListener("click", function () {
       show("puzzle");
-      startPuzzle(Math.min(loadUnlock(), window.DDPuzzles.length));
+      if (P && P.lv && Array.isArray(P.hands) && P.hands[0] && P.hands[0].length) {
+        sortHand(P.hands[0]);
+        $("pz-level").textContent = "第 " + P.lv + " 关";
+        renderPuzzle();
+        schedulePzAI();
+        pzLog("已恢复上一局残局。");
+      } else {
+        startPuzzle(Math.min(loadUnlock(), window.DDPuzzles.length));
+      }
     });
-    $("btn-exit-classic").addEventListener("click", function () { C = null; try { localStorage.removeItem(SAVE_CLASSIC); } catch (e) {} show("menu"); });
-    $("btn-exit-puzzle").addEventListener("click", function () { P = null; show("menu"); });
+    $("btn-exit-classic").addEventListener("click", function () { C = null; save(); show("menu"); });
+    $("btn-exit-puzzle").addEventListener("click", function () { P = null; save(); show("menu"); });
     $("btn-pz-prev").addEventListener("click", function () { if (P && P.lv > 1) startPuzzle(P.lv - 1); });
     $("btn-pz-next").addEventListener("click", function () { if (P && P.lv < loadUnlock()) startPuzzle(P.lv + 1); });
 
@@ -710,13 +832,14 @@
     $("btn-result-ok").addEventListener("click", function () {
       $("result-modal").classList.add("hidden");
       var action = $("btn-result-ok").dataset.action;
-      if (action === "classic") { C = null; try { localStorage.removeItem(SAVE_CLASSIC); } catch (e) {} show("classic"); freshClassic(); }
-      else if (action === "puzzle-next") { var nl = Math.min(P.lv + 1, window.DDPuzzles.length); P = null; show("puzzle"); startPuzzle(nl); }
-      else if (action === "puzzle-retry") { var lv = P.lv; P = null; startPuzzle(lv); }
+      if (action === "classic") { C = null; save(); show("classic"); freshClassic(); }
+      else if (action === "puzzle-next") { var nl = Math.min(P.lv + 1, window.DDPuzzles.length); P = null; save(); show("puzzle"); startPuzzle(nl); }
+      else if (action === "puzzle-retry") { var lv = P.lv; P = null; save(); startPuzzle(lv); }
     });
     $("lock-close").addEventListener("click", function () { $("time-lock").classList.add("hidden"); });
 
     show("menu");
+    if (gameSync) gameSync.start();
     setTimeout(function () {
       try { if (window.DaoBox && window.DaoBox.timeExceeded) applyTimeLock(); } catch (e) {}
     }, 1200);

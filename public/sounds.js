@@ -164,6 +164,7 @@
     mode = m;
     if (m === 2 && was !== 2) { var c = ac(); if (c) { var t0 = c.currentTime + 0.02; [523, 659, 784, 1047].forEach(function (f, i) { tone(f, t0 + i * 0.09, 0.2, 0.12, "triangle"); }); } }
     try { localStorage.setItem(SAVE_KEY, String(m)); } catch (e) {}
+    try { window.dispatchEvent(new CustomEvent("dbdoudizhu:soundchange", { detail: { mode: m } })); } catch (e) {}
     if (mode === 2) startBGM(); else stopBGM();
   }
   function toggle() { setMode(mode === 0 ? 2 : mode - 1); return mode; }
